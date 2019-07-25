@@ -1,69 +1,46 @@
 const {
-  pipe, map, slice, join,
+  pipe, slice, join, assign,
 } = require('lodash/fp');
 const { encode } = require('ngeohash');
+const { METERS_IN_DEGREE, GEOHASH_LENGTH, HASHKEY_LENGTH } = require('./utils/constants.utils');
 
 class GeoDataManager {
-  constructor(DynamoDB, TableName, GSI) {
-    this.DynamoDB = DynamoDB;
+  constructor(TableName, GSI) {
     this.TableName = TableName;
     this.GSI = GSI;
   }
 
-  putPoint(item) {
-    const itemInput = item;
-
-    const geohash = encode(item.latitude, item.longitude, 12);
+  static toGeoItem(item) {
+    const geohash = encode(item.latitude, item.longitude, GEOHASH_LENGTH);
 
     const hashKey = pipe(
-      slice(0, 3),
+      slice(0, HASHKEY_LENGTH),
       join(''),
     )(geohash);
 
-    itemInput.geohash = geohash;
-    itemInput.hashKey = hashKey;
-    itemInput.geoJson = `{ type: 'POINT', coordinates: [${item.latitude}, ${item.longitude}] }`;
+    const GeoItem = assign({}, item);
 
-    const params = {
-      TableName: this.TableName,
-      Item: itemInput,
-    };
+    GeoItem.geohash = geohash;
+    GeoItem.hashKey = hashKey;
+    GeoItem.geoJson = `{ type: 'POINT', coordinates: [${item.latitude}, ${item.longitude}] }`;
 
-    return this.DynamoDB.put(params).promise();
+    return GeoItem;
   }
 
-  batchPutPoints(items) {
-    const toBatchItem = item => ({
-      PutRequest: {
-        Item: item,
-      },
-    });
+  toGetNearestQuery({ latitude, longitude }, distanceInMeters) {
+    const minGeohash = encode((latitude - (distanceInMeters / METERS_IN_DEGREE)),
+      (longitude - (distanceInMeters / METERS_IN_DEGREE)), GEOHASH_LENGTH);
 
-    const batchPoints = pipe(
-      map(toBatchItem),
-    )(items);
-
-    const params = {
-      RequestItems: {
-        'parking-api-dev': batchPoints,
-      },
-    };
-
-    return this.DynamoDB.batchWrite(params).promise();
-  }
-
-  getNearest(coordinates, distanceInMeters) {
-    const minGeohash = encode((coordinates.latitude - (distanceInMeters / 111000)), (coordinates.longitude - (distanceInMeters / 111000)), 12);
-    const maxGeohash = encode((coordinates.latitude + (distanceInMeters / 111000)), (coordinates.longitude + (distanceInMeters / 111000)), 12);
+    const maxGeohash = encode((latitude + (distanceInMeters / METERS_IN_DEGREE)),
+      (longitude + (distanceInMeters / METERS_IN_DEGREE)), GEOHASH_LENGTH);
 
     const hashKey = pipe(
-      slice(0, 3),
+      slice(0, HASHKEY_LENGTH),
       join(''),
     )(maxGeohash);
 
     const params = {
       TableName: this.TableName,
-      IndexName: 'geohash-index',
       KeyConditionExpression: '#hashKey = :hashKey and #geohash between :minGeohash and :maxGeohash',
       ExpressionAttributeNames: {
         '#hashKey': 'hashKey',
@@ -80,7 +57,7 @@ class GeoDataManager {
       ? params.IndexName = this.GSI
       : params.TableName = this.TableName;
 
-    return this.DynamoDB.query(params).promise();
+    return params;
   }
 }
 
