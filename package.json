@@ -1,0 +1,13 @@
+{
+  "name": "dynamodb-geo-search",
+  "version": "0.0.1",
+  "dependencies": {
+    "lodash": "^4.17.15",
+    "ngeohash": "^0.6.3"
+  },
+  "devDependencies": {
+    "eslint": "^5.16.0",
+    "eslint-config-airbnb-base": "^13.2.0",
+    "eslint-plugin-import": "^2.18.2"
+  }
+}
