@@ -1,0 +1,9 @@
+const METERS_IN_DEGREE = 111000;
+const GEOHASH_LENGTH = 12;
+const HASHKEY_LENGTH = 3;
+
+module.exports = {
+  METERS_IN_DEGREE,
+  GEOHASH_LENGTH,
+  HASHKEY_LENGTH
+};
